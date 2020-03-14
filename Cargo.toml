@@ -1,0 +1,18 @@
+[package]
+name = "russh-agent"
+version = "0.1.0"
+authors = ["Jason Ozias <jason.ozias@kroger.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+byteorder = "1"
+bytes = "0"
+getset = "0"
+slog = { version = "2", features = ["max_level_trace", "release_max_level_trace"] }
+slog-try = "0"
+tokio = { version = "0", features = ["io-util", "macros", "rt-core", "stream", "sync"] }
+
+[dev-dependencies]
+lazy_static = "1"
