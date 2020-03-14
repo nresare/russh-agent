@@ -9,7 +9,9 @@
 //! `russh-agent` packet handling
 
 crate mod identity;
+crate mod lock;
 crate mod sign;
+crate mod unlock;
 
 use crate::error::{Error, Result};
 use agent_msg::*;
@@ -19,7 +21,18 @@ use getset::{Getters, Setters};
 use std::{convert::TryFrom, fmt};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
+// Agent Message Constants
+//
+// See https://tools.ietf.org/html/draft-miller-ssh-agent-00#section-7.1
 mod agent_msg {
+    crate const UNKNOWN: u8 = 0;
+    crate const UNKNOWN_S: &'static str = "UNKNOWN";
+
+    crate const SSH_AGENT_FAILURE: u8 = 5;
+    crate const SSH_AGENT_FAILURE_S: &'static str = "SSH_AGENT_FAILURE";
+    crate const SSH_AGENT_SUCCESS: u8 = 6;
+    crate const SSH_AGENT_SUCCESS_S: &'static str = "SSH_AGENT_SUCCESS";
+
     crate const SSH_AGENTC_REQUEST_IDENTITIES: u8 = 11;
     crate const SSH_AGENTC_REQUEST_IDENTITIES_S: &'static str = "SSH_AGENTC_REQUEST_IDENTITIES";
     crate const SSH_AGENTC_IDENTITIES_ANSWER: u8 = 12;
@@ -28,8 +41,32 @@ mod agent_msg {
     crate const SSH_AGENTC_SIGN_REQUEST_S: &'static str = "SSH_AGENTC_SIGN_REQUEST";
     crate const SSH_AGENTC_SIGN_RESPONSE: u8 = 14;
     crate const SSH_AGENTC_SIGN_RESPONSE_S: &'static str = "SSH_AGENTC_SIGN_RESPONSE";
-    crate const UNKNOWN: u8 = 0;
-    crate const UNKNOWN_S: &'static str = "UNKNOWN";
+
+    crate const SSH_AGENTC_ADD_IDENTITY: u8 = 17;
+    crate const SSH_AGENTC_ADD_IDENTITYS_S: &'static str = "SSH_AGENTC_ADD_IDENTITY";
+    crate const SSH_AGENTC_REMOVE_IDENTITY: u8 = 18;
+    crate const SSH_AGENTC_REMOVE_IDENTITY_S: &'static str = "SSH_AGENTC_REMOVE_IDENTITY";
+    crate const SSH_AGENTC_REMOVE_ALL_IDENTITIES: u8 = 19;
+    crate const SSH_AGENTC_REMOVE_ALL_IDENTITIES_S: &'static str =
+        "SSH_AGENTC_REMOVE_ALL_IDENTITIES";
+    crate const SSH_AGENTC_ADD_SMARTCARD_KEY: u8 = 20;
+    crate const SSH_AGENTC_ADD_SMARTCARD_KEY_S: &'static str = "SSH_AGENTC_ADD_SMARTCARD_KEY";
+    crate const SSH_AGENTC_REMOVE_SMARTCARD_KEY: u8 = 21;
+    crate const SSH_AGENTC_REMOVE_SMARTCARD_KEY_S: &'static str = "SSH_AGENTC_REMOVE_SMARTCARD_KEY";
+    crate const SSH_AGENTC_LOCK: u8 = 22;
+    crate const SSH_AGENTC_LOCK_S: &'static str = "SSH_AGENTC_LOCK";
+    crate const SSH_AGENTC_UNLOCK: u8 = 23;
+    crate const SSH_AGENTC_UNLOCK_S: &'static str = "SSH_AGENTC_UNLOCK";
+
+    crate const SSH_AGENTC_ADD_ID_CONSTRAINED: u8 = 25;
+    crate const SSH_AGENTC_ADD_ID_CONSTRAINED_S: &'static str = "SSH_AGENTC_ADD_ID_CONSTRAINED";
+    crate const SSH_AGENTC_ADD_SMARTCARD_KEY_CONSTRAINED: u8 = 26;
+    crate const SSH_AGENTC_ADD_SMARTCARD_KEY_CONSTRAINED_S: &'static str =
+        "SSH_AGENTC_ADD_SMARTCARD_KEY_CONSTRAINED";
+    crate const SSH_AGENTC_EXTENSION: u8 = 27;
+    crate const SSH_AGENTC_EXTENSION_S: &'static str = "SSH_AGENTC_EXTENSION";
+    crate const SSH_AGENT_EXTENSION_FAILURE: u8 = 28;
+    crate const SSH_AGENT_EXTENSION_FAILURE_S: &'static str = "SSH_AGENT_EXTENSION_FAILURE";
 }
 
 crate trait IntoPacket {
@@ -40,10 +77,23 @@ crate trait IntoPacket {
 #[repr(u8)]
 crate enum PacketKind {
     Unknown = UNKNOWN,
+    Failure = SSH_AGENT_FAILURE,
+    Success = SSH_AGENT_SUCCESS,
     RequestIdentities = SSH_AGENTC_REQUEST_IDENTITIES,
     IdentitiesAnswer = SSH_AGENTC_IDENTITIES_ANSWER,
     SignRequest = SSH_AGENTC_SIGN_REQUEST,
     SignResponse = SSH_AGENTC_SIGN_RESPONSE,
+    AddIdentity = SSH_AGENTC_ADD_IDENTITY,
+    RemoveIdentity = SSH_AGENTC_REMOVE_IDENTITY,
+    RemoveAllIdentities = SSH_AGENTC_REMOVE_ALL_IDENTITIES,
+    AddSmartcardKey = SSH_AGENTC_ADD_SMARTCARD_KEY,
+    RemoveSmartcardKey = SSH_AGENTC_REMOVE_SMARTCARD_KEY,
+    Lock = SSH_AGENTC_LOCK,
+    Unlock = SSH_AGENTC_UNLOCK,
+    AddIdConstrained = SSH_AGENTC_ADD_ID_CONSTRAINED,
+    AddSmartcardKeyConstrained = SSH_AGENTC_ADD_SMARTCARD_KEY_CONSTRAINED,
+    Extension = SSH_AGENTC_EXTENSION,
+    ExtensionFailure = SSH_AGENT_EXTENSION_FAILURE,
 }
 
 impl Default for PacketKind {
@@ -58,11 +108,24 @@ impl fmt::Display for PacketKind {
             f,
             "{}",
             match self {
+                Self::Unknown => UNKNOWN_S,
+                Self::Failure => SSH_AGENT_FAILURE_S,
+                Self::Success => SSH_AGENT_SUCCESS_S,
                 Self::RequestIdentities => SSH_AGENTC_REQUEST_IDENTITIES_S,
                 Self::IdentitiesAnswer => SSH_AGENTC_IDENTITIES_ANSWER_S,
                 Self::SignRequest => SSH_AGENTC_SIGN_REQUEST_S,
                 Self::SignResponse => SSH_AGENTC_SIGN_RESPONSE_S,
-                Self::Unknown => UNKNOWN_S,
+                Self::AddIdentity => SSH_AGENTC_ADD_IDENTITYS_S,
+                Self::RemoveIdentity => SSH_AGENTC_REMOVE_IDENTITY_S,
+                Self::RemoveAllIdentities => SSH_AGENTC_REMOVE_ALL_IDENTITIES_S,
+                Self::AddSmartcardKey => SSH_AGENTC_ADD_SMARTCARD_KEY_S,
+                Self::RemoveSmartcardKey => SSH_AGENTC_REMOVE_SMARTCARD_KEY_S,
+                Self::Lock => SSH_AGENTC_LOCK_S,
+                Self::Unlock => SSH_AGENTC_UNLOCK_S,
+                Self::AddIdConstrained => SSH_AGENTC_ADD_ID_CONSTRAINED_S,
+                Self::AddSmartcardKeyConstrained => SSH_AGENTC_ADD_SMARTCARD_KEY_CONSTRAINED_S,
+                Self::Extension => SSH_AGENTC_EXTENSION_S,
+                Self::ExtensionFailure => SSH_AGENT_EXTENSION_FAILURE_S,
             }
         )
     }
@@ -73,10 +136,23 @@ impl TryFrom<u8> for PacketKind {
 
     fn try_from(val: u8) -> Result<Self> {
         match val {
+            SSH_AGENT_FAILURE => Ok(Self::Failure),
+            SSH_AGENT_SUCCESS => Ok(Self::Success),
             SSH_AGENTC_REQUEST_IDENTITIES => Ok(Self::RequestIdentities),
             SSH_AGENTC_IDENTITIES_ANSWER => Ok(Self::IdentitiesAnswer),
             SSH_AGENTC_SIGN_REQUEST => Ok(Self::SignRequest),
             SSH_AGENTC_SIGN_RESPONSE => Ok(Self::SignResponse),
+            SSH_AGENTC_ADD_IDENTITY => Ok(Self::AddIdentity),
+            SSH_AGENTC_REMOVE_IDENTITY => Ok(Self::RemoveIdentity),
+            SSH_AGENTC_REMOVE_ALL_IDENTITIES => Ok(Self::RemoveAllIdentities),
+            SSH_AGENTC_ADD_SMARTCARD_KEY => Ok(Self::AddSmartcardKey),
+            SSH_AGENTC_REMOVE_SMARTCARD_KEY => Ok(Self::RemoveSmartcardKey),
+            SSH_AGENTC_LOCK => Ok(Self::Lock),
+            SSH_AGENTC_UNLOCK => Ok(Self::Unlock),
+            SSH_AGENTC_ADD_ID_CONSTRAINED => Ok(Self::AddIdConstrained),
+            SSH_AGENTC_ADD_SMARTCARD_KEY_CONSTRAINED => Ok(Self::AddSmartcardKeyConstrained),
+            SSH_AGENTC_EXTENSION => Ok(Self::Extension),
+            SSH_AGENT_EXTENSION_FAILURE => Ok(Self::ExtensionFailure),
             _ => Err(Error::unknown_packet_kind(val)),
         }
     }
@@ -85,6 +161,19 @@ impl TryFrom<u8> for PacketKind {
 impl Into<u8> for PacketKind {
     fn into(self) -> u8 {
         self as u8
+    }
+}
+
+impl PacketKind {
+    crate fn is_response(&self) -> bool {
+        match self {
+            Self::Failure
+            | Self::Success
+            | Self::IdentitiesAnswer
+            | Self::SignResponse
+            | Self::ExtensionFailure => true,
+            _ => false,
+        }
     }
 }
 
@@ -124,11 +213,13 @@ impl Packet {
         Ok(())
     }
 
-    #[allow(dead_code)]
     crate async fn read_packet<S>(stream: &mut S) -> Result<Self>
     where
         S: AsyncRead + Unpin + Send,
     {
+        // Setup the packet
+        let mut packet = Packet::default();
+
         // Read the message length bytes
         let mut mlen_bytes = vec![0u8; MESSAGE_LEN];
         let bytes_read = stream.read_exact(&mut mlen_bytes).await?;
@@ -136,14 +227,14 @@ impl Packet {
         let mlen = BigEndian::read_u32(&mlen_bytes);
 
         // Read the payload bytes
-        let mut payload_bytes = vec![0u8; mlen as usize];
-        let bytes_read = stream.read_exact(&mut payload_bytes).await?;
-        assert_eq!(bytes_read, mlen as usize);
+        if mlen > 0 {
+            let mut payload_bytes = vec![0u8; mlen as usize];
+            let bytes_read = stream.read_exact(&mut payload_bytes).await?;
+            assert_eq!(bytes_read, mlen as usize);
 
-        // Setup the packet
-        let mut packet = Packet::default();
-        packet.kind = PacketKind::try_from(payload_bytes[0])?;
-        packet.payload = Bytes::copy_from_slice(&payload_bytes[..]);
+            packet.kind = PacketKind::try_from(payload_bytes[0])?;
+            packet.payload = Bytes::copy_from_slice(&payload_bytes[..]);
+        }
 
         Ok(packet)
     }

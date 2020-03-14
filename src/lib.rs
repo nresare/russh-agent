@@ -15,14 +15,14 @@
 //! # use russh_agent::client::Client;
 //! let (_sender, _receiver, _client) = Client::new();
 //! ```
-#![feature(crate_visibility_modifier, error_iter)]
+#![feature(async_closure, crate_visibility_modifier, error_iter)]
 #![deny(
     absolute_paths_not_starting_with_crate,
     anonymous_parameters,
     array_into_iter,
     bare_trait_objects,
     bindings_with_variant_name,
-    box_pointers,
+    // box_pointers,
     coherence_leak_check,
     dead_code,
     deprecated,

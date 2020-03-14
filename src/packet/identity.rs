@@ -11,8 +11,92 @@
 use crate::{
     error::Result,
     packet::{IntoPacket, Packet, PacketKind},
+    utils::put_string,
 };
-use bytes::{BufMut, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
+
+#[derive(Clone, Debug)]
+crate struct AddIdentity {
+    kind: Bytes,
+    key_blob: Bytes,
+    comment: Bytes,
+}
+
+impl IntoPacket for AddIdentity {
+    fn into_packet(&self) -> Result<Packet> {
+        let mut pkt = Packet::default();
+
+        let kind = PacketKind::AddIdentity;
+        let _ = pkt.set_kind(kind.clone());
+
+        let mut payload = BytesMut::new();
+        payload.put_u8(kind.into());
+        put_string(&mut payload, &self.kind)?;
+        payload.put_slice(&self.key_blob);
+        put_string(&mut payload, &self.comment)?;
+
+        let _ = pkt.set_payload(payload.freeze());
+
+        Ok(pkt)
+    }
+}
+
+impl AddIdentity {
+    crate fn new(kind: Bytes, key_blob: Bytes, comment: Bytes) -> Self {
+        Self {
+            kind,
+            key_blob,
+            comment,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+crate struct RemoveIdentity {
+    key_blob: Bytes,
+}
+
+impl IntoPacket for RemoveIdentity {
+    fn into_packet(&self) -> Result<Packet> {
+        let mut pkt = Packet::default();
+
+        let kind = PacketKind::RemoveIdentity;
+        let _ = pkt.set_kind(kind.clone());
+
+        let mut payload = BytesMut::new();
+        payload.put_u8(kind.into());
+        put_string(&mut payload, &self.key_blob)?;
+
+        let _ = pkt.set_payload(payload.freeze());
+
+        Ok(pkt)
+    }
+}
+
+impl RemoveIdentity {
+    crate fn new(key_blob: Bytes) -> Self {
+        Self { key_blob }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+crate struct RemoveAll {}
+
+impl IntoPacket for RemoveAll {
+    fn into_packet(&self) -> Result<Packet> {
+        let mut pkt = Packet::default();
+
+        let kind = PacketKind::RemoveAllIdentities;
+        let _ = pkt.set_kind(kind.clone());
+
+        let mut payload = BytesMut::new();
+        payload.put_u8(kind.into());
+
+        let _ = pkt.set_payload(payload.freeze());
+
+        Ok(pkt)
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default)]
 crate struct RequestIdentities {}
@@ -35,7 +119,7 @@ impl IntoPacket for RequestIdentities {
 
 #[cfg(test)]
 mod test {
-    use super::RequestIdentities;
+    use super::{AddIdentity, RequestIdentities};
     use crate::{
         error::Result,
         packet::{IntoPacket, Packet, PacketKind},
@@ -43,12 +127,30 @@ mod test {
     use bytes::Bytes;
 
     #[test]
-    fn req_ident_into_packet() -> Result<()> {
+    fn request_identities() -> Result<()> {
         let req_ident = RequestIdentities::default();
         let pkt = req_ident.into_packet()?;
         let mut expected = Packet::default();
         let _ = expected.set_kind(PacketKind::RequestIdentities);
         let _ = expected.set_payload(Bytes::from_static(&[11]));
+        assert_eq!(pkt, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn add_identity() -> Result<()> {
+        let req_ident = AddIdentity::new(
+            Bytes::from_static(b"ssh-dsa"),
+            Bytes::from_static(&[0, 0, 0, 3, 0xff, 0xde, 0xd1]),
+            Bytes::from_static(b"comment"),
+        );
+        let pkt = req_ident.into_packet()?;
+        let mut expected = Packet::default();
+        let _ = expected.set_kind(PacketKind::AddIdentity);
+        let _ = expected.set_payload(Bytes::from_static(&[
+            17, 0, 0, 0, 7, b's', b's', b'h', b'-', b'd', b's', b'a', 0, 0, 0, 3, 0xff, 0xde, 0xd1,
+            0, 0, 0, 7, b'c', b'o', b'm', b'm', b'e', b'n', b't',
+        ]));
         assert_eq!(pkt, expected);
         Ok(())
     }

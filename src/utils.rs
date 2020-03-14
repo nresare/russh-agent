@@ -10,6 +10,10 @@
 
 use crate::error::Result;
 use bytes::BufMut;
+#[cfg(test)]
+use hxdmp::hexdump;
+#[cfg(test)]
+use slog::{info, trace, Level, Logger};
 use std::convert::TryInto;
 
 crate fn put_string<T>(buffer: &mut T, bytes: &[u8]) -> Result<()>
@@ -19,6 +23,26 @@ where
     let str_len = bytes.len();
     buffer.put_u32(usize::try_into(str_len)?);
     buffer.put_slice(bytes);
+    Ok(())
+}
+
+#[cfg(test)]
+crate fn hexy(prefix: &str, logger: &Logger, buf: &[u8]) -> Result<()> {
+    hexyl(prefix, logger, buf, Some(Level::Trace))
+}
+
+#[cfg(test)]
+crate fn hexyl(prefix: &str, logger: &Logger, buf: &[u8], level: Option<Level>) -> Result<()> {
+    let mut hexbuf = vec![];
+    let _ = hexdump(&buf, &mut hexbuf)?;
+    if let Some(level) = level {
+        match level {
+            Level::Info => info!(logger, "{}\n{}", prefix, String::from_utf8_lossy(&hexbuf)),
+            _ => trace!(logger, "{}\n{}", prefix, String::from_utf8_lossy(&hexbuf)),
+        }
+    } else {
+        trace!(logger, "{}\n{}", prefix, String::from_utf8_lossy(&hexbuf));
+    }
     Ok(())
 }
 
