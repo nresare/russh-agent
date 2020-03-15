@@ -26,47 +26,46 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 // See https://tools.ietf.org/html/draft-miller-ssh-agent-00#section-7.1
 mod agent_msg {
     crate const UNKNOWN: u8 = 0;
-    crate const UNKNOWN_S: &'static str = "UNKNOWN";
+    crate const UNKNOWN_S: &str = "UNKNOWN";
 
     crate const SSH_AGENT_FAILURE: u8 = 5;
-    crate const SSH_AGENT_FAILURE_S: &'static str = "SSH_AGENT_FAILURE";
+    crate const SSH_AGENT_FAILURE_S: &str = "SSH_AGENT_FAILURE";
     crate const SSH_AGENT_SUCCESS: u8 = 6;
-    crate const SSH_AGENT_SUCCESS_S: &'static str = "SSH_AGENT_SUCCESS";
+    crate const SSH_AGENT_SUCCESS_S: &str = "SSH_AGENT_SUCCESS";
 
     crate const SSH_AGENTC_REQUEST_IDENTITIES: u8 = 11;
-    crate const SSH_AGENTC_REQUEST_IDENTITIES_S: &'static str = "SSH_AGENTC_REQUEST_IDENTITIES";
+    crate const SSH_AGENTC_REQUEST_IDENTITIES_S: &str = "SSH_AGENTC_REQUEST_IDENTITIES";
     crate const SSH_AGENTC_IDENTITIES_ANSWER: u8 = 12;
-    crate const SSH_AGENTC_IDENTITIES_ANSWER_S: &'static str = "SSH_AGENTC_IDENTITIES_ANSWER";
+    crate const SSH_AGENTC_IDENTITIES_ANSWER_S: &str = "SSH_AGENTC_IDENTITIES_ANSWER";
     crate const SSH_AGENTC_SIGN_REQUEST: u8 = 13;
-    crate const SSH_AGENTC_SIGN_REQUEST_S: &'static str = "SSH_AGENTC_SIGN_REQUEST";
+    crate const SSH_AGENTC_SIGN_REQUEST_S: &str = "SSH_AGENTC_SIGN_REQUEST";
     crate const SSH_AGENTC_SIGN_RESPONSE: u8 = 14;
-    crate const SSH_AGENTC_SIGN_RESPONSE_S: &'static str = "SSH_AGENTC_SIGN_RESPONSE";
+    crate const SSH_AGENTC_SIGN_RESPONSE_S: &str = "SSH_AGENTC_SIGN_RESPONSE";
 
     crate const SSH_AGENTC_ADD_IDENTITY: u8 = 17;
-    crate const SSH_AGENTC_ADD_IDENTITYS_S: &'static str = "SSH_AGENTC_ADD_IDENTITY";
+    crate const SSH_AGENTC_ADD_IDENTITYS_S: &str = "SSH_AGENTC_ADD_IDENTITY";
     crate const SSH_AGENTC_REMOVE_IDENTITY: u8 = 18;
-    crate const SSH_AGENTC_REMOVE_IDENTITY_S: &'static str = "SSH_AGENTC_REMOVE_IDENTITY";
+    crate const SSH_AGENTC_REMOVE_IDENTITY_S: &str = "SSH_AGENTC_REMOVE_IDENTITY";
     crate const SSH_AGENTC_REMOVE_ALL_IDENTITIES: u8 = 19;
-    crate const SSH_AGENTC_REMOVE_ALL_IDENTITIES_S: &'static str =
-        "SSH_AGENTC_REMOVE_ALL_IDENTITIES";
+    crate const SSH_AGENTC_REMOVE_ALL_IDENTITIES_S: &str = "SSH_AGENTC_REMOVE_ALL_IDENTITIES";
     crate const SSH_AGENTC_ADD_SMARTCARD_KEY: u8 = 20;
-    crate const SSH_AGENTC_ADD_SMARTCARD_KEY_S: &'static str = "SSH_AGENTC_ADD_SMARTCARD_KEY";
+    crate const SSH_AGENTC_ADD_SMARTCARD_KEY_S: &str = "SSH_AGENTC_ADD_SMARTCARD_KEY";
     crate const SSH_AGENTC_REMOVE_SMARTCARD_KEY: u8 = 21;
-    crate const SSH_AGENTC_REMOVE_SMARTCARD_KEY_S: &'static str = "SSH_AGENTC_REMOVE_SMARTCARD_KEY";
+    crate const SSH_AGENTC_REMOVE_SMARTCARD_KEY_S: &str = "SSH_AGENTC_REMOVE_SMARTCARD_KEY";
     crate const SSH_AGENTC_LOCK: u8 = 22;
-    crate const SSH_AGENTC_LOCK_S: &'static str = "SSH_AGENTC_LOCK";
+    crate const SSH_AGENTC_LOCK_S: &str = "SSH_AGENTC_LOCK";
     crate const SSH_AGENTC_UNLOCK: u8 = 23;
-    crate const SSH_AGENTC_UNLOCK_S: &'static str = "SSH_AGENTC_UNLOCK";
+    crate const SSH_AGENTC_UNLOCK_S: &str = "SSH_AGENTC_UNLOCK";
 
     crate const SSH_AGENTC_ADD_ID_CONSTRAINED: u8 = 25;
-    crate const SSH_AGENTC_ADD_ID_CONSTRAINED_S: &'static str = "SSH_AGENTC_ADD_ID_CONSTRAINED";
+    crate const SSH_AGENTC_ADD_ID_CONSTRAINED_S: &str = "SSH_AGENTC_ADD_ID_CONSTRAINED";
     crate const SSH_AGENTC_ADD_SMARTCARD_KEY_CONSTRAINED: u8 = 26;
-    crate const SSH_AGENTC_ADD_SMARTCARD_KEY_CONSTRAINED_S: &'static str =
+    crate const SSH_AGENTC_ADD_SMARTCARD_KEY_CONSTRAINED_S: &str =
         "SSH_AGENTC_ADD_SMARTCARD_KEY_CONSTRAINED";
     crate const SSH_AGENTC_EXTENSION: u8 = 27;
-    crate const SSH_AGENTC_EXTENSION_S: &'static str = "SSH_AGENTC_EXTENSION";
+    crate const SSH_AGENTC_EXTENSION_S: &str = "SSH_AGENTC_EXTENSION";
     crate const SSH_AGENT_EXTENSION_FAILURE: u8 = 28;
-    crate const SSH_AGENT_EXTENSION_FAILURE_S: &'static str = "SSH_AGENT_EXTENSION_FAILURE";
+    crate const SSH_AGENT_EXTENSION_FAILURE_S: &str = "SSH_AGENT_EXTENSION_FAILURE";
 }
 
 crate trait IntoPacket {
@@ -208,7 +207,7 @@ impl Packet {
         final_packet.put_slice(self.payload());
         let fp = final_packet.freeze();
 
-        let _ = stream.write_all(&fp).await?;
+        stream.write_all(&fp).await?;
 
         Ok(())
     }
@@ -276,8 +275,7 @@ mod test {
         Ok(())
     }
 
-    const PACKET_EXPECTED: &'static str =
-        r#"Packet { kind: SSH_AGENTC_SIGN_REQUEST, payload: [8 bytes] }"#;
+    const PACKET_EXPECTED: &str = r#"Packet { kind: SSH_AGENTC_SIGN_REQUEST, payload: [8 bytes] }"#;
 
     #[test]
     fn display() -> Result<()> {

@@ -145,7 +145,7 @@ impl Client {
                         } else if let Some(pkt) = pkt_opt {
                             try_trace!(self.logger, "Agent => {}", pkt.kind());
                             try_trace!(self.logger, "PKT: {}", pkt);
-                            let _ = pkt.write_packet(&mut stream).await?;
+                            pkt.write_packet(&mut stream).await?;
                         } else {
                             disconnected = true;
                         }
@@ -159,7 +159,7 @@ impl Client {
                         Ok(packet) => {
                             try_trace!(self.logger, "Agent <= {}", packet.kind());
                             if packet.kind().is_response() {
-                                let _ = self.sender.send(packet.payload().clone()).await?;
+                                self.sender.send(packet.payload().clone()).await?;
                             } else {
                                 try_error!(self.logger, "invalid response packet read! {}", packet);
                             }

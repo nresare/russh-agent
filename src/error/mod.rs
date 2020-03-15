@@ -78,10 +78,11 @@ impl fmt::Display for Error {
         let _skip_me = iter.next();
         write!(f, "{}: {}", self.code, self.reason)?;
 
-        while let Some(e) = iter.next() {
+        for e in iter {
             writeln!(f)?;
             write!(f, "{}", e)?;
         }
+
         Ok(())
     }
 }

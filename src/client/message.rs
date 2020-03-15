@@ -17,15 +17,15 @@
 use bytes::Bytes;
 use std::fmt;
 
-const ADD_IDENTITY: &'static str = "Add Identity";
-const ADD_IDENTITY_CONSTRAINED: &'static str = "Add Identity Constrained";
-const REMOVE_IDENTITY: &'static str = "Remove Identity";
-const REMOVE_ALL_IDENTITIES: &'static str = "Remove All Identities";
-const REQUEST_IDENTITIES: &'static str = "Request Identities";
-const SIGNATURE_REQUEST: &'static str = "Signature Request";
-const LOCK: &'static str = "Lock";
-const UNLOCK: &'static str = "Unlock";
-const SHUTDOWN: &'static str = "Shutdown";
+const ADD_IDENTITY: &str = "Add Identity";
+const ADD_IDENTITY_CONSTRAINED: &str = "Add Identity Constrained";
+const REMOVE_IDENTITY: &str = "Remove Identity";
+const REMOVE_ALL_IDENTITIES: &str = "Remove All Identities";
+const REQUEST_IDENTITIES: &str = "Request Identities";
+const SIGNATURE_REQUEST: &str = "Signature Request";
+const LOCK: &str = "Lock";
+const UNLOCK: &str = "Unlock";
+const SHUTDOWN: &str = "Shutdown";
 
 /// Agent Messages
 #[derive(Clone, Debug)]
