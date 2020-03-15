@@ -104,7 +104,7 @@ mod test {
             let actual: &str = (*err_code).into();
             assert_eq!(&actual, s);
             let actual_s: String = (*err_code).into();
-            assert_eq!(actual_s, s.to_string());
+            assert_eq!(actual_s, (*s).to_string());
         }
     }
 

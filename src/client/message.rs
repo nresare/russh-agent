@@ -78,7 +78,10 @@ impl fmt::Display for Message {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use super::{
+        Message, ADD_IDENTITY_CONSTRAINED, LOCK, REMOVE_ALL_IDENTITIES, REMOVE_IDENTITY,
+        REQUEST_IDENTITIES, SHUTDOWN, SIGNATURE_REQUEST, UNLOCK,
+    };
     use crate::error::Result;
     use bytes::Bytes;
     use lazy_static::lazy_static;

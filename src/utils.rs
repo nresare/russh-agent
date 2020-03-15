@@ -34,7 +34,7 @@ crate fn hexy(prefix: &str, logger: &Logger, buf: &[u8]) -> Result<()> {
 #[cfg(test)]
 crate fn hexyl(prefix: &str, logger: &Logger, buf: &[u8], level: Option<Level>) -> Result<()> {
     let mut hexbuf = vec![];
-    let _ = hexdump(&buf, &mut hexbuf)?;
+    hexdump(&buf, &mut hexbuf)?;
     if let Some(level) = level {
         match level {
             Level::Info => info!(logger, "{}\n{}", prefix, String::from_utf8_lossy(&hexbuf)),
@@ -63,7 +63,7 @@ mod test {
         buffer.clear();
         expected.clear();
 
-        put_string(&mut buffer, "".as_bytes())?;
+        put_string(&mut buffer, b"")?;
         expected.extend(&[0, 0, 0, 0]);
         assert_eq!(expected, buffer);
         Ok(())

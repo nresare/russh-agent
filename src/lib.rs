@@ -102,6 +102,7 @@
     where_clauses_object_safety,
     while_true
 )]
+#![warn(clippy::all, clippy::pedantic)]
 
 pub mod client;
 mod error;

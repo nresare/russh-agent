@@ -103,6 +103,7 @@ impl Client {
     /// This returns a sender that should be used to request ssh-agent work
     /// via [Message](crate::client::Message), and a receiver to listen for the results
     /// of those requests in [Bytes](bytes::Bytes).
+    #[must_use]
     pub fn new() -> (Sender<Message>, Receiver<Bytes>, Self) {
         let (msg_sender, msg_receiver) = channel(10);
         let (agent_sender, agent_receiver) = channel(10);
@@ -117,6 +118,9 @@ impl Client {
     }
 
     /// Run the agent handler
+    ///
+    /// # Errors
+    ///
     pub async fn run<R>(mut self, mut stream: R) -> Result<()>
     where
         R: AsyncRead + AsyncWrite + Unpin + Send,
@@ -279,14 +283,10 @@ mod test {
 
     async fn receive(mut receiver: Receiver<Bytes>, logger: Logger) -> Result<()> {
         let mut count = 0;
-        loop {
-            if let Some(msg) = receiver.recv().await {
-                trace!(logger, "Receiver <= Msg");
-                let _ = hexy("MSG", &logger, &msg);
-                count += 1;
-            } else {
-                break;
-            }
+        while let Some(msg) = receiver.recv().await {
+            trace!(logger, "Receiver <= Msg");
+            let _ = hexy("MSG", &logger, &msg);
+            count += 1;
         }
         assert_eq!(count, 10);
         Ok(())

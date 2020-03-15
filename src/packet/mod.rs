@@ -14,7 +14,20 @@ crate mod sign;
 crate mod unlock;
 
 use crate::error::{Error, Result};
-use agent_msg::*;
+use agent_msg::{
+    SSH_AGENTC_ADD_IDENTITY, SSH_AGENTC_ADD_IDENTITYS_S, SSH_AGENTC_ADD_ID_CONSTRAINED,
+    SSH_AGENTC_ADD_ID_CONSTRAINED_S, SSH_AGENTC_ADD_SMARTCARD_KEY,
+    SSH_AGENTC_ADD_SMARTCARD_KEY_CONSTRAINED, SSH_AGENTC_ADD_SMARTCARD_KEY_CONSTRAINED_S,
+    SSH_AGENTC_ADD_SMARTCARD_KEY_S, SSH_AGENTC_EXTENSION, SSH_AGENTC_EXTENSION_S,
+    SSH_AGENTC_IDENTITIES_ANSWER, SSH_AGENTC_IDENTITIES_ANSWER_S, SSH_AGENTC_LOCK,
+    SSH_AGENTC_LOCK_S, SSH_AGENTC_REMOVE_ALL_IDENTITIES, SSH_AGENTC_REMOVE_ALL_IDENTITIES_S,
+    SSH_AGENTC_REMOVE_IDENTITY, SSH_AGENTC_REMOVE_IDENTITY_S, SSH_AGENTC_REMOVE_SMARTCARD_KEY,
+    SSH_AGENTC_REMOVE_SMARTCARD_KEY_S, SSH_AGENTC_REQUEST_IDENTITIES,
+    SSH_AGENTC_REQUEST_IDENTITIES_S, SSH_AGENTC_SIGN_REQUEST, SSH_AGENTC_SIGN_REQUEST_S,
+    SSH_AGENTC_SIGN_RESPONSE, SSH_AGENTC_SIGN_RESPONSE_S, SSH_AGENTC_UNLOCK, SSH_AGENTC_UNLOCK_S,
+    SSH_AGENT_EXTENSION_FAILURE, SSH_AGENT_EXTENSION_FAILURE_S, SSH_AGENT_FAILURE,
+    SSH_AGENT_FAILURE_S, SSH_AGENT_SUCCESS, SSH_AGENT_SUCCESS_S, UNKNOWN, UNKNOWN_S,
+};
 use byteorder::{BigEndian, ByteOrder};
 use bytes::{BufMut, Bytes, BytesMut};
 use getset::{Getters, Setters};
@@ -220,14 +233,14 @@ impl Packet {
         let mut packet = Packet::default();
 
         // Read the message length bytes
-        let mut mlen_bytes = vec![0u8; MESSAGE_LEN];
+        let mut mlen_bytes = vec![0_u8; MESSAGE_LEN];
         let bytes_read = stream.read_exact(&mut mlen_bytes).await?;
         assert_eq!(bytes_read, MESSAGE_LEN);
         let mlen = BigEndian::read_u32(&mlen_bytes);
 
         // Read the payload bytes
         if mlen > 0 {
-            let mut payload_bytes = vec![0u8; mlen as usize];
+            let mut payload_bytes = vec![0_u8; mlen as usize];
             let bytes_read = stream.read_exact(&mut payload_bytes).await?;
             assert_eq!(bytes_read, mlen as usize);
 
@@ -254,7 +267,7 @@ mod test {
         let _ = pkt.set_kind(PacketKind::SignRequest);
         let _ = pkt.set_payload(Bytes::from_static(&[13, 0, 0, 0, 3, b'a', b'b', b'c']));
 
-        let _ = pkt.write_packet(&mut actual).await?;
+        pkt.write_packet(&mut actual).await?;
 
         let expected = &[0, 0, 0, 8, 13, 0, 0, 0, 3, b'a', b'b', b'c'];
 

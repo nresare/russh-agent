@@ -52,6 +52,7 @@ impl fmt::Display for Constraint {
 
 impl Constraint {
     /// Create a lifetime constraint
+    #[must_use]
     pub fn lifetime(seconds: u32) -> Self {
         let mut payload_b = BytesMut::new();
         payload_b.put_u8(SSH_AGENT_CONSTRAIN_LIFETIME);
@@ -64,6 +65,7 @@ impl Constraint {
     }
 
     /// Create a confirm constraint
+    #[must_use]
     pub fn confirm() -> Self {
         let mut payload_b = BytesMut::new();
         payload_b.put_u8(SSH_AGENT_CONSTRAIN_CONFIRM);
