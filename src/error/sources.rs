@@ -39,6 +39,13 @@ dep_error!(
     ErrCode::Io,
     "There was an error sending out bytes"
 );
+#[cfg(test)]
+dep_error!(
+    tokio::sync::mpsc::error::SendError<crate::client::Message>,
+    ErrSource::SendMessage,
+    ErrCode::Io,
+    "There was an error sending out bytes"
+);
 dep_error!(
     std::num::TryFromIntError,
     ErrSource::TryFromInt,
@@ -74,6 +81,9 @@ pub enum ErrSource {
     Join(tokio::task::JoinError),
     /// An error occurred trying to send bytes
     SendBytes(tokio::sync::mpsc::error::SendError<bytes::Bytes>),
+    #[cfg(test)]
+    /// An error occurred trying to send bytes
+    SendMessage(tokio::sync::mpsc::error::SendError<crate::client::Message>),
     /// An error converting from an int
     TryFromInt(std::num::TryFromIntError),
     /// An error reading an environment variable
@@ -91,6 +101,8 @@ impl fmt::Display for ErrSource {
             #[cfg(test)]
             Self::Join(source) => write!(f, "{}", source),
             Self::SendBytes(source) => write!(f, "{}", source),
+            #[cfg(test)]
+            Self::SendMessage(source) => write!(f, "{}", source),
             Self::TryFromInt(source) => write!(f, "{}", source),
             Self::Var(source) => write!(f, "{}", source),
         }

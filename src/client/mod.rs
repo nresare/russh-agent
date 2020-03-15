@@ -14,61 +14,50 @@
 //! # use bytes::Bytes;
 //! # use std::{env, time::Duration};
 //! # use tokio::{join, net::UnixStream, spawn, time::delay_for};
+//! #
+//! #[tokio::main]
+//! async fn main() -> Result<()> {
+//!   // Get the agent socket here
+//!   let (actual_agent, sock) = setup_socket().await?;
+//!   let (sender, mut receiver, mut client) = Client::new();
 //!
-//! # async fn setup_socket() -> Result<(bool, UnixStream)> {
-//! #   Ok(match env::var("SSH_AUTH_SOCK") {
-//! #     Ok(v) => (true, UnixStream::connect(v).await?),
-//! #     Err(_) => {
-//! #         let (up, _down) = UnixStream::pair()?;
-//! #         (false, up)
-//! #     }
-//! #   })
-//! # }
-//! # #[tokio::main]
-//! # async fn main() -> Result<()> {
-//! # // Get the agent socket here
-//! # let (actual_agent, sock) = setup_socket().await?;
-//! let (sender, mut receiver, mut client) = Client::new();
+//!   if actual_agent {
+//!     // This is the client task
+//!     let ssh_agent_client = spawn(client.run(sock));
 //!
-//! # if actual_agent {
-//! // This is the client task
-//! let ssh_agent_client = spawn(async move {
-//!    let client_handle = spawn(client.run(sock));
-//!    let _ = client_handle.await;
-//! });
+//!     // This is a simulated sender of messages to the client
+//!     let mut sender = sender.clone();
+//!     let work = spawn(async move {
+//!        let _ = sender.send(Message::List).await;
+//!        delay_for(Duration::from_millis(100)).await;
+//!        let _ = sender.send(Message::Shutdown).await;
+//!     });
 //!
-//! // This is a simulated sender of messages to the client
-//! let mut sender_c = sender.clone();
-//! let work = spawn(async move {
-//!    delay_for(Duration::from_millis(100)).await;
-//!    let _ = sender_c.send(Message::List).await;
-//!    delay_for(Duration::from_millis(100)).await;
-//!    let _ = sender_c
-//!        .send(Message::Lock(Bytes::from_static(b"test")))
-//!        .await;
-//!    delay_for(Duration::from_millis(100)).await;
-//!    let _ = sender_c
-//!        .send(Message::Unlock(Bytes::from_static(b"test")))
-//!        .await;
-//!    delay_for(Duration::from_millis(500)).await;
-//!    let _ = sender_c.send(Message::Shutdown).await;
-//! });
-//!
-//! // This is the receiver of agent responses
-//! let receive = spawn(async move {
-//!    loop {
-//!        if let Some(msg) = receiver.recv().await {
-//!            // Process your msg here!
-//!        } else {
-//!            break;
+//!     // This is the receiver of agent responses
+//!     let receive = spawn(async move {
+//!        loop {
+//!            if let Some(msg) = receiver.recv().await {
+//!                // Process your msg here!
+//!            } else {
+//!                break;
+//!            }
 //!        }
-//!    }
-//! });
+//!     });
 //!
-//! let _ = join!(ssh_agent_client, receive, work);
-//! # }
-//! #   Ok(())
-//! # }
+//!     let _ = join!(ssh_agent_client, receive, work);
+//!   }
+//!   Ok(())
+//! }
+//!
+//! async fn setup_socket() -> Result<(bool, UnixStream)> {
+//!   Ok(match env::var("SSH_AUTH_SOCK") {
+//!     Ok(v) => (true, UnixStream::connect(v).await?),
+//!     Err(_) => {
+//!         let (up, _down) = UnixStream::pair()?;
+//!         (false, up)
+//!     }
+//!   })
+//! }
 //! ```
 
 mod message;
@@ -225,108 +214,153 @@ mod test {
     use slog_async::Async;
     use slog_term::{FullFormat, TermDecorator};
     use std::{env, time::Duration};
-    use tokio::{join, net::UnixStream, spawn, time::delay_for};
+    use tokio::{
+        join,
+        net::UnixStream,
+        spawn,
+        sync::mpsc::{Receiver, Sender},
+        time::delay_for,
+    };
 
-    async fn setup_socket() -> Result<(bool, UnixStream)> {
-        Ok(match env::var("SSH_AUTH_SOCK") {
-            Ok(v) => (true, UnixStream::connect(v).await?),
-            Err(_) => {
-                let (up, _down) = UnixStream::pair()?;
-                (false, up)
-            }
-        })
+    async fn setup_socket() -> Result<UnixStream> {
+        let path = env::var("SSH_AUTH_SOCK")?;
+        Ok(UnixStream::connect(path).await?)
     }
 
     #[tokio::test]
     async fn client() -> Result<()> {
-        let (actual_agent, sock) = setup_socket().await?;
-        let (sender, mut receiver, mut client) = Client::new();
+        if let Ok(sock) = setup_socket().await {
+            // Setup the ssh-agent client
+            let (sender, receiver, mut client) = Client::new();
 
-        let decorator = TermDecorator::new().build();
-        let term_drain = FullFormat::new(decorator).build().fuse();
-        let async_drain = Async::new(term_drain).build().fuse();
-        let log = Logger::root(async_drain, o!());
-        let _ = client.set_logger(Some(log.clone()));
+            // Setup some logging
+            let decorator = TermDecorator::new().build();
+            let term_drain = FullFormat::new(decorator).build().fuse();
+            let async_drain = Async::new(term_drain).build().fuse();
+            let log = Logger::root(async_drain, o!());
+            let _ = client.set_logger(Some(log.clone()));
 
-        if actual_agent {
             // This is the client task
-            let client = spawn(async move {
-                let client_handle = spawn(client.run(sock));
-                let _ = client_handle.await;
-            });
+            let client = spawn(client.run(sock));
 
             // This is a simulated sender of messages
-            let mut sender_c = sender.clone();
-            let work = spawn(async move {
-                // Add an identity
-                let mut csprng = OsRng {};
-                let keypair = Keypair::generate(&mut csprng);
-                let key_bytes = keypair.to_bytes();
-                let mut add_ident_payload = BytesMut::new();
-                let public_key = &key_bytes[32..];
-                let _ = put_string(&mut add_ident_payload, public_key);
-                let _ = put_string(&mut add_ident_payload, &key_bytes);
-
-                let add = Message::Add(
-                    Bytes::from_static(b"ssh-ed25519"),
-                    add_ident_payload.freeze(),
-                    Bytes::from_static(b"test key"),
-                );
-                let _ = sender_c.send(add).await;
-                delay_for(Duration::from_millis(100)).await;
-
-                // Remove the identity
-                let mut remove_payload = BytesMut::new();
-                let _ = put_string(&mut remove_payload, b"ssh-ed25519");
-                let _ = put_string(&mut remove_payload, &public_key);
-
-                let remove = Message::Remove(remove_payload.freeze());
-                let _ = sender_c.send(remove).await;
-                delay_for(Duration::from_millis(100)).await;
-
-                // List the remaining identited
-                let _ = sender_c.send(Message::List).await;
-                delay_for(Duration::from_millis(100)).await;
-
-                // Remove all identities
-                let remove_all = Message::RemoveAll;
-                let _ = sender_c.send(remove_all).await;
-                delay_for(Duration::from_millis(100)).await;
-
-                // List the remaining identited
-                let _ = sender_c.send(Message::List).await;
-                delay_for(Duration::from_millis(100)).await;
-
-                // Lock the agent
-                let _ = sender_c
-                    .send(Message::Lock(Bytes::from_static(b"test")))
-                    .await;
-                delay_for(Duration::from_millis(100)).await;
-
-                // Unlock the agent
-                let _ = sender_c
-                    .send(Message::Unlock(Bytes::from_static(b"test")))
-                    .await;
-                delay_for(Duration::from_millis(100)).await;
-
-                let _ = sender_c.send(Message::Shutdown).await;
-            });
+            let send = spawn(send(sender.clone()));
 
             // This is the receiver of agent responses
-            let log_c = log.clone();
-            let receive = spawn(async move {
-                loop {
-                    if let Some(msg) = receiver.recv().await {
-                        trace!(log_c, "Receiver <= Msg");
-                        let _ = hexy("MSG", &log_c, &msg);
-                    } else {
-                        break;
-                    }
-                }
-            });
+            let receive = spawn(receive(receiver, log.clone()));
 
-            let _ = join!(client, receive, work);
+            // Start 'em all up
+            let _ = join!(client, receive, send);
         }
+        Ok(())
+    }
+
+    async fn send(mut sender: Sender<Message>) -> Result<()> {
+        // Add an identity
+        if let Ok(pk) = add_identity(&mut sender).await {
+            // Sign something
+            assert!(sign_data(&mut sender, &pk).await.is_ok());
+            // Lock the agent
+            assert!(lock_agent(&mut sender).await.is_ok());
+            // Sign something (this should generate a failure at the reciever)
+            assert!(sign_data(&mut sender, &pk).await.is_ok());
+            // Unlock the agent
+            assert!(unlock_agent(&mut sender).await.is_ok());
+            // Sign something
+            assert!(sign_data(&mut sender, &pk).await.is_ok());
+            // Remove the identity
+            assert!(remove_identity(&mut sender, &pk).await.is_ok());
+        }
+
+        // List the remaining identites
+        assert!(list_identities(&mut sender).await.is_ok());
+        // Remove all identities
+        assert!(remove_all_identities(&mut sender).await.is_ok());
+        // List the remaining identites (there should be none)
+        assert!(list_identities(&mut sender).await.is_ok());
+
+        let _ = sender.send(Message::Shutdown).await;
+        Ok(())
+    }
+
+    async fn receive(mut receiver: Receiver<Bytes>, logger: Logger) -> Result<()> {
+        let mut count = 0;
+        loop {
+            if let Some(msg) = receiver.recv().await {
+                trace!(logger, "Receiver <= Msg");
+                let _ = hexy("MSG", &logger, &msg);
+                count += 1;
+            } else {
+                break;
+            }
+        }
+        assert_eq!(count, 10);
+        Ok(())
+    }
+
+    async fn add_identity(sender: &mut Sender<Message>) -> Result<Vec<u8>> {
+        let mut csprng = OsRng {};
+        let keypair = Keypair::generate(&mut csprng);
+        let key_bytes = keypair.to_bytes();
+        let mut add_ident_payload = BytesMut::new();
+        let public_key = &key_bytes[32..];
+        put_string(&mut add_ident_payload, public_key)?;
+        put_string(&mut add_ident_payload, &key_bytes)?;
+
+        let add = Message::Add(
+            Bytes::from_static(b"ssh-ed25519"),
+            add_ident_payload.freeze(),
+            Bytes::from_static(b"test key"),
+        );
+        sender.send(add).await?;
+        delay_for(Duration::from_millis(100)).await;
+        Ok(public_key.into())
+    }
+
+    async fn remove_identity(sender: &mut Sender<Message>, pk: &[u8]) -> Result<()> {
+        let mut key_blob = BytesMut::new();
+        put_string(&mut key_blob, b"ssh-ed25519")?;
+        put_string(&mut key_blob, pk)?;
+        let remove = Message::Remove(key_blob.freeze());
+        sender.send(remove).await?;
+        delay_for(Duration::from_millis(100)).await;
+        Ok(())
+    }
+
+    async fn sign_data(sender: &mut Sender<Message>, pk: &[u8]) -> Result<()> {
+        let mut key_blob = BytesMut::new();
+        put_string(&mut key_blob, b"ssh-ed25519")?;
+        put_string(&mut key_blob, pk)?;
+        let sign = Message::Sign(key_blob.freeze(), Bytes::from_static(b"testing"), 0);
+        sender.send(sign).await?;
+        delay_for(Duration::from_millis(100)).await;
+        Ok(())
+    }
+
+    async fn lock_agent(sender: &mut Sender<Message>) -> Result<()> {
+        let lock = Message::Lock(Bytes::from_static(b"test"));
+        sender.send(lock).await?;
+        delay_for(Duration::from_millis(100)).await;
+        Ok(())
+    }
+
+    async fn unlock_agent(sender: &mut Sender<Message>) -> Result<()> {
+        let unlock = Message::Unlock(Bytes::from_static(b"test"));
+        sender.send(unlock).await?;
+        delay_for(Duration::from_millis(100)).await;
+        Ok(())
+    }
+
+    async fn list_identities(sender: &mut Sender<Message>) -> Result<()> {
+        sender.send(Message::List).await?;
+        delay_for(Duration::from_millis(100)).await;
+        Ok(())
+    }
+
+    async fn remove_all_identities(sender: &mut Sender<Message>) -> Result<()> {
+        let remove_all = Message::RemoveAll;
+        sender.send(remove_all).await?;
+        delay_for(Duration::from_millis(100)).await;
         Ok(())
     }
 }
