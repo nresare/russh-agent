@@ -83,12 +83,6 @@ use tokio::{
 };
 
 /// An asynchronous ssh-agent client implementation
-///
-/// # Example
-/// ```
-/// # use russh_agent::client::Client;
-/// let (_sender, _receiver, _client) = Client::new();
-/// ```
 #[derive(Debug, Setters)]
 pub struct Client {
     /// An optional slog logger

@@ -12,8 +12,54 @@
 //!
 //! # Example
 //! ```
-//! # use russh_agent::client::Client;
-//! let (_sender, _receiver, _client) = Client::new();
+//! # use russh_agent::{Result, client::{Client, Message}};
+//! # use bytes::Bytes;
+//! # use std::{env, time::Duration};
+//! # use tokio::{join, net::UnixStream, spawn, time::delay_for};
+//! #
+//! #[tokio::main]
+//! async fn main() -> Result<()> {
+//!   // Get the agent socket here
+//!   let (actual_agent, sock) = setup_socket().await?;
+//!   let (sender, mut receiver, mut client) = Client::new();
+//!
+//!   if actual_agent {
+//!     // This is the client task
+//!     let ssh_agent_client = spawn(client.run(sock));
+//!
+//!     // This is a simulated sender of messages to the client
+//!     let mut sender = sender.clone();
+//!     let work = spawn(async move {
+//!        let _ = sender.send(Message::List).await;
+//!        delay_for(Duration::from_millis(100)).await;
+//!        let _ = sender.send(Message::Shutdown).await;
+//!     });
+//!
+//!     // This is the receiver of agent responses
+//!     let receive = spawn(async move {
+//!        loop {
+//!            if let Some(msg) = receiver.recv().await {
+//!                // Process your msg here!
+//!            } else {
+//!                break;
+//!            }
+//!        }
+//!     });
+//!
+//!     let _ = join!(ssh_agent_client, receive, work);
+//!   }
+//!   Ok(())
+//! }
+//!
+//! async fn setup_socket() -> Result<(bool, UnixStream)> {
+//!   Ok(match env::var("SSH_AUTH_SOCK") {
+//!     Ok(v) => (true, UnixStream::connect(v).await?),
+//!     Err(_) => {
+//!         let (up, _down) = UnixStream::pair()?;
+//!         (false, up)
+//!     }
+//!   })
+//! }
 //! ```
 #![feature(async_closure, crate_visibility_modifier, error_iter)]
 #![deny(
