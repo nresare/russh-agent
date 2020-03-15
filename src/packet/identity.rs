@@ -52,6 +52,45 @@ impl AddIdentity {
 }
 
 #[derive(Clone, Debug)]
+crate struct AddIdentityConstrained {
+    kind: Bytes,
+    key_blob: Bytes,
+    comment: Bytes,
+    constraints: Bytes,
+}
+
+impl IntoPacket for AddIdentityConstrained {
+    fn into_packet(&self) -> Result<Packet> {
+        let mut pkt = Packet::default();
+
+        let kind = PacketKind::AddIdentity;
+        let _ = pkt.set_kind(kind.clone());
+
+        let mut payload = BytesMut::new();
+        payload.put_u8(kind.into());
+        put_string(&mut payload, &self.kind)?;
+        payload.put_slice(&self.key_blob);
+        put_string(&mut payload, &self.comment)?;
+        payload.put_slice(&self.constraints);
+
+        let _ = pkt.set_payload(payload.freeze());
+
+        Ok(pkt)
+    }
+}
+
+impl AddIdentityConstrained {
+    crate fn new(kind: Bytes, key_blob: Bytes, comment: Bytes, constraints: Bytes) -> Self {
+        Self {
+            kind,
+            key_blob,
+            comment,
+            constraints,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 crate struct RemoveIdentity {
     key_blob: Bytes,
 }

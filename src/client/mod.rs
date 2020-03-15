@@ -60,13 +60,18 @@
 //! }
 //! ```
 
+mod constraint;
 mod message;
+
+pub use constraint::Constraint;
 pub use message::Message;
 
 use crate::{
     error::Result,
     packet::{
-        identity::{AddIdentity, RemoveAll, RemoveIdentity, RequestIdentities},
+        identity::{
+            AddIdentity, AddIdentityConstrained, RemoveAll, RemoveIdentity, RequestIdentities,
+        },
         lock::Lock,
         sign::SignRequest,
         unlock::Unlock,
@@ -123,53 +128,26 @@ impl Client {
                 msg_opt = self.receiver.recv() => {
                     if let Some(msg) = msg_opt {
                         try_trace!(self.logger, "Agent <= {}", msg);
-                        match msg {
-                            Message::Add(kind, key_blob, comment) => {
-                                let pkt = AddIdentity::new(kind, key_blob, comment).into_packet()?;
-                                try_trace!(self.logger, "Agent => {}", pkt.kind());
-                                try_trace!(self.logger, "PKT: {}", pkt);
-                                let _ = pkt.write_packet(&mut stream).await?;
-                            }
-                            Message::Remove(key_blob) => {
-                                let pkt = RemoveIdentity::new(key_blob).into_packet()?;
-                                try_trace!(self.logger, "Agent => {}", pkt.kind());
-                                try_trace!(self.logger, "PKT: {}", pkt);
-                                let _ = pkt.write_packet(&mut stream).await?;
-                            }
-                            Message::RemoveAll => {
-                                let pkt = RemoveAll::default().into_packet()?;
-                                try_trace!(self.logger, "Agent => {}", pkt.kind());
-                                try_trace!(self.logger, "PKT: {}", pkt);
-                                let _ = pkt.write_packet(&mut stream).await?;
-                            }
-                            Message::List => {
-                                let pkt = RequestIdentities::default().into_packet()?;
-                                try_trace!(self.logger, "Agent => {}", pkt.kind());
-                                try_trace!(self.logger, "PKT: {}", pkt);
-                                let _ = pkt.write_packet(&mut stream).await?;
-                            }
-                            Message::Sign(key, data, flags) => {
-                                let pkt = SignRequest::new(key, data, flags).into_packet()?;
-                                try_trace!(self.logger, "Agent => {}", pkt.kind());
-                                try_trace!(self.logger, "PKT: {}", pkt);
-                                let _ = pkt.write_packet(&mut stream).await?;
-                            }
-                            Message::Lock(passphrase) => {
-                                let pkt = Lock::new(passphrase).into_packet()?;
-                                try_trace!(self.logger, "Agent => {}", pkt.kind());
-                                try_trace!(self.logger, "PKT: {}", pkt);
-                                let _ = pkt.write_packet(&mut stream).await?;
-                            }
-                            Message::Unlock(passphrase) => {
-                                let pkt = Unlock::new(passphrase).into_packet()?;
-                                try_trace!(self.logger, "Agent => {}", pkt.kind());
-                                try_trace!(self.logger, "PKT: {}", pkt);
-                                let _ = pkt.write_packet(&mut stream).await?;
-                            }
-                            Message::Shutdown => {
-                                try_trace!(self.logger, "Shutting down");
-                                disconnected = true;
-                            }
+                        let (disconnect, pkt_opt) = match msg {
+                            Message::Add(kind, key_blob, comment) => (false, Some(AddIdentity::new(kind, key_blob, comment).into_packet()?)),
+                            Message::AddConstrained(kind, key_blob, comment, constraints) => (false, Some(AddIdentityConstrained::new(kind, key_blob, comment, constraints).into_packet()?)),
+                            Message::Remove(key_blob) => (false, Some(RemoveIdentity::new(key_blob).into_packet()?)),
+                            Message::RemoveAll => (false, Some(RemoveAll::default().into_packet()?)),
+                            Message::List => (false, Some(RequestIdentities::default().into_packet()?)),
+                            Message::Sign(key, data, flags) => (false, Some(SignRequest::new(key, data, flags).into_packet()?)),
+                            Message::Lock(passphrase) => (false, Some(Lock::new(passphrase).into_packet()?)),
+                            Message::Unlock(passphrase) => (false, Some(Unlock::new(passphrase).into_packet()?)),
+                            Message::Shutdown => (true, None),
+                        };
+                        if disconnect && pkt_opt.is_none() {
+                            try_trace!(self.logger, "Shutdown received");
+                            disconnected = true;
+                        } else if let Some(pkt) = pkt_opt {
+                            try_trace!(self.logger, "Agent => {}", pkt.kind());
+                            try_trace!(self.logger, "PKT: {}", pkt);
+                            let _ = pkt.write_packet(&mut stream).await?;
+                        } else {
+                            disconnected = true;
                         }
                     } else {
                         try_error!(self.logger, "NONE received, sender likely dropped");
@@ -199,7 +177,12 @@ impl Client {
 #[cfg(test)]
 mod test {
     use super::Client;
-    use crate::{client::Message, error::Result, utils::hexy, utils::put_string};
+    use crate::{
+        client::{Constraint, Message},
+        error::Result,
+        utils::hexy,
+        utils::put_string,
+    };
     use bytes::Bytes;
     use bytes::BytesMut;
     use ed25519_dalek::Keypair;
@@ -251,7 +234,24 @@ mod test {
 
     async fn send(mut sender: Sender<Message>) -> Result<()> {
         // Add an identity
-        if let Ok(pk) = add_identity(&mut sender).await {
+        if let Ok(pk) = add_identity(&mut sender, None).await {
+            // Sign something
+            assert!(sign_data(&mut sender, &pk).await.is_ok());
+            // Lock the agent
+            assert!(lock_agent(&mut sender).await.is_ok());
+            // Sign something (this should generate a failure at the reciever)
+            assert!(sign_data(&mut sender, &pk).await.is_ok());
+            // Unlock the agent
+            assert!(unlock_agent(&mut sender).await.is_ok());
+            // Sign something
+            assert!(sign_data(&mut sender, &pk).await.is_ok());
+            // Remove the identity
+            assert!(remove_identity(&mut sender, &pk).await.is_ok());
+        }
+
+        // Add a constrained identity
+        let constraint = Constraint::lifetime(1000);
+        if let Ok(pk) = add_identity(&mut sender, Some(constraint.payload().clone())).await {
             // Sign something
             assert!(sign_data(&mut sender, &pk).await.is_ok());
             // Lock the agent
@@ -292,7 +292,10 @@ mod test {
         Ok(())
     }
 
-    async fn add_identity(sender: &mut Sender<Message>) -> Result<Vec<u8>> {
+    async fn add_identity(
+        sender: &mut Sender<Message>,
+        const_opt: Option<Bytes>,
+    ) -> Result<Vec<u8>> {
         let mut csprng = OsRng {};
         let keypair = Keypair::generate(&mut csprng);
         let key_bytes = keypair.to_bytes();
@@ -301,11 +304,20 @@ mod test {
         put_string(&mut add_ident_payload, public_key)?;
         put_string(&mut add_ident_payload, &key_bytes)?;
 
-        let add = Message::Add(
-            Bytes::from_static(b"ssh-ed25519"),
-            add_ident_payload.freeze(),
-            Bytes::from_static(b"test key"),
-        );
+        let add = if let Some(constraints) = const_opt {
+            Message::AddConstrained(
+                Bytes::from_static(b"ssh-ed25519"),
+                add_ident_payload.freeze(),
+                Bytes::from_static(b"test key"),
+                constraints,
+            )
+        } else {
+            Message::Add(
+                Bytes::from_static(b"ssh-ed25519"),
+                add_ident_payload.freeze(),
+                Bytes::from_static(b"test key"),
+            )
+        };
         sender.send(add).await?;
         delay_for(Duration::from_millis(100)).await;
         Ok(public_key.into())

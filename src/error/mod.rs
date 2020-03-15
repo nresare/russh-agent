@@ -15,10 +15,10 @@ pub use sources::ErrSource;
 
 use std::fmt;
 
-/// A result that must include an `russh_agent::Error`
+/// A result that must include a [Error]
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// An error from the library
+/// `russh-agent` error
 #[derive(Debug)]
 pub struct Error {
     /// the code

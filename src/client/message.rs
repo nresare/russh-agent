@@ -18,6 +18,7 @@ use bytes::Bytes;
 use std::fmt;
 
 const ADD_IDENTITY: &'static str = "Add Identity";
+const ADD_IDENTITY_CONSTRAINED: &'static str = "Add Identity Constrained";
 const REMOVE_IDENTITY: &'static str = "Remove Identity";
 const REMOVE_ALL_IDENTITIES: &'static str = "Remove All Identities";
 const REQUEST_IDENTITIES: &'static str = "Request Identities";
@@ -31,6 +32,8 @@ const SHUTDOWN: &'static str = "Shutdown";
 pub enum Message {
     /// Add an identity to the agent, (i.e. Add(type, key, comment))
     Add(Bytes, Bytes, Bytes),
+    /// Add a constrained identity to the agent, (i.e. Add(type, key, comment))
+    AddConstrained(Bytes, Bytes, Bytes, Bytes),
     /// Remove an identity from the agent
     Remove(Bytes),
     /// Remove all identities
@@ -60,6 +63,7 @@ impl fmt::Display for Message {
             "{}",
             match self {
                 Self::Add(_, _, _) => ADD_IDENTITY,
+                Self::AddConstrained(_, _, _, _) => ADD_IDENTITY_CONSTRAINED,
                 Self::Remove(_) => REMOVE_IDENTITY,
                 Self::RemoveAll => REMOVE_ALL_IDENTITIES,
                 Self::List => REQUEST_IDENTITIES,
@@ -94,6 +98,15 @@ mod test {
             (REMOVE_IDENTITY, Message::Remove(Bytes::default()));
         static ref TEST_CASE_7: (&'static str, Message) =
             (REMOVE_ALL_IDENTITIES, Message::RemoveAll);
+        static ref TEST_CASE_8: (&'static str, Message) = (
+            ADD_IDENTITY_CONSTRAINED,
+            Message::AddConstrained(
+                Bytes::default(),
+                Bytes::default(),
+                Bytes::default(),
+                Bytes::default()
+            )
+        );
         static ref TEST_CASES: Vec<(&'static str, Message)> = {
             let mut test_cases = Vec::new();
             test_cases.push(TEST_CASE_1.clone());
@@ -103,6 +116,7 @@ mod test {
             test_cases.push(TEST_CASE_5.clone());
             test_cases.push(TEST_CASE_6.clone());
             test_cases.push(TEST_CASE_7.clone());
+            test_cases.push(TEST_CASE_8.clone());
             test_cases
         };
     }

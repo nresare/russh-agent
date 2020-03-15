@@ -6,7 +6,7 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-//! `russh-agent` Error Sources
+//! `russh-agent` error source
 use crate::error::{ErrCode, Error};
 use std::fmt;
 
@@ -67,12 +67,12 @@ dep_error!(
     "There was an error at the tokio join point"
 );
 
-/// DataQ Error Source
+/// `russh-agent` error source
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant, variant_size_differences)]
 pub enum ErrSource {
     #[cfg(test)]
-    /// An error
+    /// An error formatting in a display test
     Fmt(std::fmt::Error),
     /// An I/O error
     Io(std::io::Error),
