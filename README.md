@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/russh-agent.svg)](https://crates.io/crates/russh-agent)
 [![Crates.io](https://img.shields.io/crates/l/russh-agent.svg)](https://crates.io/crates/russh-agent)
 [![Crates.io](https://img.shields.io/crates/d/russh-agent.svg)](https://crates.io/crates/russh-agent)
-![](https://github.com/rustyhorde/russh-agent/workflows/.github/workflows/stuff.yml/badge.svg)
+![](https://github.com/rustyhorde/russh-agent/workflows/nightly/badge.svg)
 
 
 <!-- ## Build Status
