@@ -59,6 +59,11 @@ impl Error {
             None,
         )
     }
+
+    // #[cfg(test)]
+    // crate fn invalid_ssh_string() -> Self {
+    //     Self::new(ErrCode::Protocol, "Tried to read an invalid string", None)
+    // }
 }
 
 impl std::error::Error for Error {

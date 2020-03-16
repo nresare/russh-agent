@@ -8,7 +8,11 @@
 
 //! `russh-agent` utility functions
 
+// #[cfg(test)]
+// use crate::error::Error;
 use crate::error::Result;
+// #[cfg(test)]
+// use bytes::Buf;
 use bytes::BufMut;
 #[cfg(test)]
 use hxdmp::hexdump;
@@ -25,6 +29,25 @@ where
     buffer.put_slice(bytes);
     Ok(())
 }
+
+// #[cfg(test)]
+// crate fn read_string<T>(buffer: &mut T) -> Result<String>
+// where
+//     T: Buf,
+// {
+//     if buffer.remaining() >= 4 {
+//         let str_len = buffer.get_u32() as usize;
+//         if str_len <= buffer.remaining() {
+//             let mut string_buf = vec![0; str_len];
+//             buffer.copy_to_slice(&mut string_buf);
+//             Ok(String::from_utf8_lossy(&string_buf).to_string())
+//         } else {
+//             Err(Error::invalid_ssh_string())
+//         }
+//     } else {
+//         Err(Error::invalid_ssh_string())
+//     }
+// }
 
 #[cfg(test)]
 crate fn hexy(prefix: &str, logger: &Logger, buf: &[u8]) -> Result<()> {

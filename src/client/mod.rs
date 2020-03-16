@@ -187,14 +187,19 @@ mod test {
         utils::hexy,
         utils::put_string,
     };
-    use bytes::Bytes;
-    use bytes::BytesMut;
+    use bytes::{Buf, Bytes, BytesMut};
     use ed25519_dalek::Keypair;
+    use lazy_static::lazy_static;
     use rand::rngs::OsRng;
     use slog::{o, trace, Drain, Logger};
     use slog_async::Async;
     use slog_term::{FullFormat, TermDecorator};
-    use std::{env, time::Duration};
+    use slog_try::try_trace;
+    use std::{
+        env,
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
     use tokio::{
         join,
         net::UnixStream,
@@ -202,6 +207,10 @@ mod test {
         sync::mpsc::{Receiver, Sender},
         time::delay_for,
     };
+
+    lazy_static! {
+        static ref PREV_KEYS: Arc<Mutex<Vec<(String, String)>>> = Arc::new(Mutex::new(vec![]));
+    }
 
     async fn setup_socket() -> Result<UnixStream> {
         let path = env::var("SSH_AUTH_SOCK")?;
@@ -215,11 +224,17 @@ mod test {
             let (sender, receiver, mut client) = Client::new();
 
             // Setup some logging
-            let decorator = TermDecorator::new().build();
-            let term_drain = FullFormat::new(decorator).build().fuse();
-            let async_drain = Async::new(term_drain).build().fuse();
-            let log = Logger::root(async_drain, o!());
-            let _ = client.set_logger(Some(log.clone()));
+            let logger = if let Ok(val) = env::var("RA_LOG_TEST") {
+                println!("RA_LOG_TEST: {}", val);
+                let decorator = TermDecorator::new().build();
+                let term_drain = FullFormat::new(decorator).build().fuse();
+                let async_drain = Async::new(term_drain).build().fuse();
+                let log = Logger::root(async_drain, o!());
+                let _ = client.set_logger(Some(log.clone()));
+                Some(log)
+            } else {
+                None
+            };
 
             // This is the client task
             let client = spawn(client.run(sock));
@@ -228,68 +243,88 @@ mod test {
             let send = spawn(send(sender.clone()));
 
             // This is the receiver of agent responses
-            let receive = spawn(receive(receiver, log.clone()));
+            let receive = spawn(receive(receiver, logger));
 
             // Start 'em all up
-            let _ = join!(client, receive, send);
+            let (_, recv, _) = join!(client, receive, send);
+
+            if let Ok(res) = recv {
+                if let Ok(responses) = res {
+                    assert_eq!(16, responses.len());
+                    assert_eq!(
+                        vec![12, 6, 14, 6, 5, 6, 14, 6, 6, 14, 6, 5, 6, 14, 6, 12],
+                        responses
+                    );
+                    Ok(())
+                } else {
+                    Err("protocol:receive task failed".into())
+                }
+            } else {
+                Err("protocol:receive task failed".into())
+            }
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 
     async fn send(mut sender: Sender<Message>) -> Result<()> {
+        // List the remaining identites
+        list_identities(&mut sender).await?;
+
         // Add an identity
         if let Ok(pk) = add_identity(&mut sender, None).await {
             // Sign something
-            assert!(sign_data(&mut sender, &pk).await.is_ok());
+            sign_data(&mut sender, &pk).await?;
             // Lock the agent
-            assert!(lock_agent(&mut sender).await.is_ok());
+            lock_agent(&mut sender).await?;
             // Sign something (this should generate a failure at the reciever)
-            assert!(sign_data(&mut sender, &pk).await.is_ok());
+            sign_data(&mut sender, &pk).await?;
             // Unlock the agent
-            assert!(unlock_agent(&mut sender).await.is_ok());
+            unlock_agent(&mut sender).await?;
             // Sign something
-            assert!(sign_data(&mut sender, &pk).await.is_ok());
+            sign_data(&mut sender, &pk).await?;
             // Remove the identity
-            assert!(remove_identity(&mut sender, &pk).await.is_ok());
+            remove_identity(&mut sender, &pk).await?;
         }
 
         // Add a constrained identity
         let constraint = Constraint::lifetime(1000);
         if let Ok(pk) = add_identity(&mut sender, Some(constraint.payload().clone())).await {
             // Sign something
-            assert!(sign_data(&mut sender, &pk).await.is_ok());
+            sign_data(&mut sender, &pk).await?;
             // Lock the agent
-            assert!(lock_agent(&mut sender).await.is_ok());
+            lock_agent(&mut sender).await?;
             // Sign something (this should generate a failure at the reciever)
-            assert!(sign_data(&mut sender, &pk).await.is_ok());
+            sign_data(&mut sender, &pk).await?;
             // Unlock the agent
-            assert!(unlock_agent(&mut sender).await.is_ok());
+            unlock_agent(&mut sender).await?;
             // Sign something
-            assert!(sign_data(&mut sender, &pk).await.is_ok());
+            sign_data(&mut sender, &pk).await?;
             // Remove the identity
-            assert!(remove_identity(&mut sender, &pk).await.is_ok());
+            remove_identity(&mut sender, &pk).await?;
         }
 
         // List the remaining identites
-        assert!(list_identities(&mut sender).await.is_ok());
-        // Remove all identities
-        assert!(remove_all_identities(&mut sender).await.is_ok());
-        // List the remaining identites (there should be none)
-        assert!(list_identities(&mut sender).await.is_ok());
+        list_identities(&mut sender).await?;
 
+        // Shut it down
+        delay_for(Duration::from_millis(250)).await;
         let _ = sender.send(Message::Shutdown).await;
+
         Ok(())
     }
 
-    async fn receive(mut receiver: Receiver<Bytes>, logger: Logger) -> Result<()> {
-        let mut count = 0;
-        while let Some(msg) = receiver.recv().await {
-            trace!(logger, "Receiver <= Msg");
-            let _ = hexy("MSG", &logger, &msg);
-            count += 1;
+    async fn receive(mut receiver: Receiver<Bytes>, logger: Option<Logger>) -> Result<Vec<u8>> {
+        let mut responses = vec![];
+        while let Some(mut msg) = receiver.recv().await {
+            try_trace!(logger, "Receiver <= Msg");
+
+            if let Some(log) = &logger {
+                let _ = hexy("MSG", log, &msg);
+            }
+            responses.push(msg.get_u8());
         }
-        assert_eq!(count, 10);
-        Ok(())
+        Ok(responses)
     }
 
     async fn add_identity(
@@ -363,6 +398,7 @@ mod test {
         Ok(())
     }
 
+    #[allow(dead_code)]
     async fn remove_all_identities(sender: &mut Sender<Message>) -> Result<()> {
         let remove_all = Message::RemoveAll;
         sender.send(remove_all).await?;
