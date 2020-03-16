@@ -5,6 +5,7 @@
 [![Crates.io](https://img.shields.io/crates/d/russh-agent.svg)](https://crates.io/crates/russh-agent)
 ![](https://github.com/rustyhorde/russh-agent/workflows/nightly/badge.svg)
 
+[Draft RFC](https://tools.ietf.org/html/draft-miller-ssh-agent-00)
 
 <!-- ## Build Status
 |              |                                                                                   |
