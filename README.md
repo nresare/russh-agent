@@ -6,6 +6,7 @@
 ![](https://github.com/rustyhorde/russh-agent/workflows/nightly/badge.svg)
 
 [Draft RFC](https://tools.ietf.org/html/draft-miller-ssh-agent-00)
+[Ed25519 PK Draft RFC](https://tools.ietf.org/html/draft-ietf-curdle-ssh-ed25519-00)
 
 <!-- ## Build Status
 |              |                                                                                   |
