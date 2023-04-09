@@ -78,16 +78,13 @@ impl std::error::Error for Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let err: &(dyn std::error::Error) = self;
-        let mut iter = err.chain();
-        let _skip_me = iter.next();
+        let mut err: &(dyn std::error::Error) = self;
         write!(f, "{}: {}", self.code, self.reason)?;
-
-        for e in iter {
+        while let Some(e) = err.source() {
             writeln!(f)?;
             write!(f, "{}", e)?;
+            err = e;
         }
-
         Ok(())
     }
 }
