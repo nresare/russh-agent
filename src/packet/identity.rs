@@ -16,7 +16,7 @@ use crate::{
 use bytes::{BufMut, Bytes, BytesMut};
 
 #[derive(Clone, Debug)]
-crate struct AddIdentity {
+pub(crate) struct AddIdentity {
     kind: Bytes,
     key_blob: Bytes,
     comment: Bytes,
@@ -42,7 +42,7 @@ impl IntoPacket for AddIdentity {
 }
 
 impl AddIdentity {
-    crate fn new(kind: Bytes, key_blob: Bytes, comment: Bytes) -> Self {
+    pub(crate) fn new(kind: Bytes, key_blob: Bytes, comment: Bytes) -> Self {
         Self {
             kind,
             key_blob,
@@ -52,7 +52,7 @@ impl AddIdentity {
 }
 
 #[derive(Clone, Debug)]
-crate struct AddIdentityConstrained {
+pub(crate) struct AddIdentityConstrained {
     kind: Bytes,
     key_blob: Bytes,
     comment: Bytes,
@@ -80,7 +80,7 @@ impl IntoPacket for AddIdentityConstrained {
 }
 
 impl AddIdentityConstrained {
-    crate fn new(kind: Bytes, key_blob: Bytes, comment: Bytes, constraints: Bytes) -> Self {
+    pub(crate) fn new(kind: Bytes, key_blob: Bytes, comment: Bytes, constraints: Bytes) -> Self {
         Self {
             kind,
             key_blob,
@@ -91,7 +91,7 @@ impl AddIdentityConstrained {
 }
 
 #[derive(Clone, Debug)]
-crate struct RemoveIdentity {
+pub(crate) struct RemoveIdentity {
     key_blob: Bytes,
 }
 
@@ -113,13 +113,13 @@ impl IntoPacket for RemoveIdentity {
 }
 
 impl RemoveIdentity {
-    crate fn new(key_blob: Bytes) -> Self {
+    pub(crate) fn new(key_blob: Bytes) -> Self {
         Self { key_blob }
     }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-crate struct RemoveAll {}
+pub(crate) struct RemoveAll {}
 
 impl IntoPacket for RemoveAll {
     fn into_packet(&self) -> Result<Packet> {
@@ -138,7 +138,7 @@ impl IntoPacket for RemoveAll {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-crate struct RequestIdentities {}
+pub(crate) struct RequestIdentities {}
 
 impl IntoPacket for RequestIdentities {
     fn into_packet(&self) -> Result<Packet> {

@@ -20,7 +20,7 @@ use hxdmp::hexdump;
 use slog::{info, trace, Level, Logger};
 use std::convert::TryInto;
 
-crate fn put_string<T>(buffer: &mut T, bytes: &[u8]) -> Result<()>
+pub(crate) fn put_string<T>(buffer: &mut T, bytes: &[u8]) -> Result<()>
 where
     T: BufMut,
 {
@@ -31,7 +31,7 @@ where
 }
 
 // #[cfg(test)]
-// crate fn read_string<T>(buffer: &mut T) -> Result<String>
+// pub(crate) fn read_string<T>(buffer: &mut T) -> Result<String>
 // where
 //     T: Buf,
 // {
@@ -50,12 +50,12 @@ where
 // }
 
 #[cfg(test)]
-crate fn hexy(prefix: &str, logger: &Logger, buf: &[u8]) -> Result<()> {
+pub(crate) fn hexy(prefix: &str, logger: &Logger, buf: &[u8]) -> Result<()> {
     hexyl(prefix, logger, buf, Some(Level::Trace))
 }
 
 #[cfg(test)]
-crate fn hexyl(prefix: &str, logger: &Logger, buf: &[u8], level: Option<Level>) -> Result<()> {
+pub(crate) fn hexyl(prefix: &str, logger: &Logger, buf: &[u8], level: Option<Level>) -> Result<()> {
     let mut hexbuf = vec![];
     hexdump(&buf, &mut hexbuf)?;
     if let Some(level) = level {

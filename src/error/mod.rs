@@ -10,7 +10,7 @@
 mod codes;
 mod sources;
 
-crate use codes::ErrCode;
+pub(crate) use codes::ErrCode;
 pub use sources::ErrSource;
 
 use std::fmt;
@@ -39,7 +39,7 @@ impl PartialEq for Error {
 }
 
 impl Error {
-    crate fn new<U>(code: ErrCode, reason: U, source: Option<ErrSource>) -> Self
+    pub(crate) fn new<U>(code: ErrCode, reason: U, source: Option<ErrSource>) -> Self
     where
         U: Into<String>,
     {
@@ -52,7 +52,7 @@ impl Error {
         }
     }
 
-    crate fn unknown_packet_kind(val: u8) -> Self {
+    pub(crate) fn unknown_packet_kind(val: u8) -> Self {
         Self::new(
             ErrCode::Protocol,
             format!("The value {} cannot be converted to a PacketKind", val),
@@ -61,7 +61,7 @@ impl Error {
     }
 
     // #[cfg(test)]
-    // crate fn invalid_ssh_string() -> Self {
+    // pub(crate) fn invalid_ssh_string() -> Self {
     //     Self::new(ErrCode::Protocol, "Tried to read an invalid string", None)
     // }
 }

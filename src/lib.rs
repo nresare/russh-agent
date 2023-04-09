@@ -15,7 +15,7 @@
 //! # Server
 //! TBD
 //!
-#![feature(async_closure, crate_visibility_modifier)]
+#![feature(async_closure)]
 #![deny(
     absolute_paths_not_starting_with_crate,
     anonymous_parameters,

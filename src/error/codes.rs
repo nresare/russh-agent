@@ -11,7 +11,7 @@ use std::fmt;
 
 /// Error Codes
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-crate enum ErrCode {
+pub(crate) enum ErrCode {
     /// An environmental error
     Env,
     /// An I/O error

@@ -16,7 +16,7 @@ use crate::{
 use bytes::{BufMut, Bytes, BytesMut};
 
 #[derive(Clone, Debug)]
-crate struct Unlock {
+pub(crate) struct Unlock {
     passphrase: Bytes,
 }
 
@@ -38,7 +38,7 @@ impl IntoPacket for Unlock {
 }
 
 impl Unlock {
-    crate fn new(passphrase: Bytes) -> Self {
+    pub(crate) fn new(passphrase: Bytes) -> Self {
         Self { passphrase }
     }
 }

@@ -8,10 +8,10 @@
 
 //! `russh-agent` packet handling
 
-crate mod identity;
-crate mod lock;
-crate mod sign;
-crate mod unlock;
+pub(crate) mod identity;
+pub(crate) mod lock;
+pub(crate) mod sign;
+pub(crate) mod unlock;
 
 use crate::error::{Error, Result};
 use agent_msg::{
@@ -38,56 +38,56 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 //
 // See https://tools.ietf.org/html/draft-miller-ssh-agent-00#section-7.1
 mod agent_msg {
-    crate const UNKNOWN: u8 = 0;
-    crate const UNKNOWN_S: &str = "UNKNOWN";
+    pub(crate) const UNKNOWN: u8 = 0;
+    pub(crate) const UNKNOWN_S: &str = "UNKNOWN";
 
-    crate const SSH_AGENT_FAILURE: u8 = 5;
-    crate const SSH_AGENT_FAILURE_S: &str = "SSH_AGENT_FAILURE";
-    crate const SSH_AGENT_SUCCESS: u8 = 6;
-    crate const SSH_AGENT_SUCCESS_S: &str = "SSH_AGENT_SUCCESS";
+    pub(crate) const SSH_AGENT_FAILURE: u8 = 5;
+    pub(crate) const SSH_AGENT_FAILURE_S: &str = "SSH_AGENT_FAILURE";
+    pub(crate) const SSH_AGENT_SUCCESS: u8 = 6;
+    pub(crate) const SSH_AGENT_SUCCESS_S: &str = "SSH_AGENT_SUCCESS";
 
-    crate const SSH_AGENTC_REQUEST_IDENTITIES: u8 = 11;
-    crate const SSH_AGENTC_REQUEST_IDENTITIES_S: &str = "SSH_AGENTC_REQUEST_IDENTITIES";
-    crate const SSH_AGENTC_IDENTITIES_ANSWER: u8 = 12;
-    crate const SSH_AGENTC_IDENTITIES_ANSWER_S: &str = "SSH_AGENTC_IDENTITIES_ANSWER";
-    crate const SSH_AGENTC_SIGN_REQUEST: u8 = 13;
-    crate const SSH_AGENTC_SIGN_REQUEST_S: &str = "SSH_AGENTC_SIGN_REQUEST";
-    crate const SSH_AGENTC_SIGN_RESPONSE: u8 = 14;
-    crate const SSH_AGENTC_SIGN_RESPONSE_S: &str = "SSH_AGENTC_SIGN_RESPONSE";
+    pub(crate) const SSH_AGENTC_REQUEST_IDENTITIES: u8 = 11;
+    pub(crate) const SSH_AGENTC_REQUEST_IDENTITIES_S: &str = "SSH_AGENTC_REQUEST_IDENTITIES";
+    pub(crate) const SSH_AGENTC_IDENTITIES_ANSWER: u8 = 12;
+    pub(crate) const SSH_AGENTC_IDENTITIES_ANSWER_S: &str = "SSH_AGENTC_IDENTITIES_ANSWER";
+    pub(crate) const SSH_AGENTC_SIGN_REQUEST: u8 = 13;
+    pub(crate) const SSH_AGENTC_SIGN_REQUEST_S: &str = "SSH_AGENTC_SIGN_REQUEST";
+    pub(crate) const SSH_AGENTC_SIGN_RESPONSE: u8 = 14;
+    pub(crate) const SSH_AGENTC_SIGN_RESPONSE_S: &str = "SSH_AGENTC_SIGN_RESPONSE";
 
-    crate const SSH_AGENTC_ADD_IDENTITY: u8 = 17;
-    crate const SSH_AGENTC_ADD_IDENTITYS_S: &str = "SSH_AGENTC_ADD_IDENTITY";
-    crate const SSH_AGENTC_REMOVE_IDENTITY: u8 = 18;
-    crate const SSH_AGENTC_REMOVE_IDENTITY_S: &str = "SSH_AGENTC_REMOVE_IDENTITY";
-    crate const SSH_AGENTC_REMOVE_ALL_IDENTITIES: u8 = 19;
-    crate const SSH_AGENTC_REMOVE_ALL_IDENTITIES_S: &str = "SSH_AGENTC_REMOVE_ALL_IDENTITIES";
-    crate const SSH_AGENTC_ADD_SMARTCARD_KEY: u8 = 20;
-    crate const SSH_AGENTC_ADD_SMARTCARD_KEY_S: &str = "SSH_AGENTC_ADD_SMARTCARD_KEY";
-    crate const SSH_AGENTC_REMOVE_SMARTCARD_KEY: u8 = 21;
-    crate const SSH_AGENTC_REMOVE_SMARTCARD_KEY_S: &str = "SSH_AGENTC_REMOVE_SMARTCARD_KEY";
-    crate const SSH_AGENTC_LOCK: u8 = 22;
-    crate const SSH_AGENTC_LOCK_S: &str = "SSH_AGENTC_LOCK";
-    crate const SSH_AGENTC_UNLOCK: u8 = 23;
-    crate const SSH_AGENTC_UNLOCK_S: &str = "SSH_AGENTC_UNLOCK";
+    pub(crate) const SSH_AGENTC_ADD_IDENTITY: u8 = 17;
+    pub(crate) const SSH_AGENTC_ADD_IDENTITYS_S: &str = "SSH_AGENTC_ADD_IDENTITY";
+    pub(crate) const SSH_AGENTC_REMOVE_IDENTITY: u8 = 18;
+    pub(crate) const SSH_AGENTC_REMOVE_IDENTITY_S: &str = "SSH_AGENTC_REMOVE_IDENTITY";
+    pub(crate) const SSH_AGENTC_REMOVE_ALL_IDENTITIES: u8 = 19;
+    pub(crate) const SSH_AGENTC_REMOVE_ALL_IDENTITIES_S: &str = "SSH_AGENTC_REMOVE_ALL_IDENTITIES";
+    pub(crate) const SSH_AGENTC_ADD_SMARTCARD_KEY: u8 = 20;
+    pub(crate) const SSH_AGENTC_ADD_SMARTCARD_KEY_S: &str = "SSH_AGENTC_ADD_SMARTCARD_KEY";
+    pub(crate) const SSH_AGENTC_REMOVE_SMARTCARD_KEY: u8 = 21;
+    pub(crate) const SSH_AGENTC_REMOVE_SMARTCARD_KEY_S: &str = "SSH_AGENTC_REMOVE_SMARTCARD_KEY";
+    pub(crate) const SSH_AGENTC_LOCK: u8 = 22;
+    pub(crate) const SSH_AGENTC_LOCK_S: &str = "SSH_AGENTC_LOCK";
+    pub(crate) const SSH_AGENTC_UNLOCK: u8 = 23;
+    pub(crate) const SSH_AGENTC_UNLOCK_S: &str = "SSH_AGENTC_UNLOCK";
 
-    crate const SSH_AGENTC_ADD_ID_CONSTRAINED: u8 = 25;
-    crate const SSH_AGENTC_ADD_ID_CONSTRAINED_S: &str = "SSH_AGENTC_ADD_ID_CONSTRAINED";
-    crate const SSH_AGENTC_ADD_SMARTCARD_KEY_CONSTRAINED: u8 = 26;
-    crate const SSH_AGENTC_ADD_SMARTCARD_KEY_CONSTRAINED_S: &str =
+    pub(crate) const SSH_AGENTC_ADD_ID_CONSTRAINED: u8 = 25;
+    pub(crate) const SSH_AGENTC_ADD_ID_CONSTRAINED_S: &str = "SSH_AGENTC_ADD_ID_CONSTRAINED";
+    pub(crate) const SSH_AGENTC_ADD_SMARTCARD_KEY_CONSTRAINED: u8 = 26;
+    pub(crate) const SSH_AGENTC_ADD_SMARTCARD_KEY_CONSTRAINED_S: &str =
         "SSH_AGENTC_ADD_SMARTCARD_KEY_CONSTRAINED";
-    crate const SSH_AGENTC_EXTENSION: u8 = 27;
-    crate const SSH_AGENTC_EXTENSION_S: &str = "SSH_AGENTC_EXTENSION";
-    crate const SSH_AGENT_EXTENSION_FAILURE: u8 = 28;
-    crate const SSH_AGENT_EXTENSION_FAILURE_S: &str = "SSH_AGENT_EXTENSION_FAILURE";
+    pub(crate) const SSH_AGENTC_EXTENSION: u8 = 27;
+    pub(crate) const SSH_AGENTC_EXTENSION_S: &str = "SSH_AGENTC_EXTENSION";
+    pub(crate) const SSH_AGENT_EXTENSION_FAILURE: u8 = 28;
+    pub(crate) const SSH_AGENT_EXTENSION_FAILURE_S: &str = "SSH_AGENT_EXTENSION_FAILURE";
 }
 
-crate trait IntoPacket {
+pub(crate) trait IntoPacket {
     fn into_packet(&self) -> Result<Packet>;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
-crate enum PacketKind {
+pub(crate) enum PacketKind {
     Unknown = UNKNOWN,
     Failure = SSH_AGENT_FAILURE,
     Success = SSH_AGENT_SUCCESS,
@@ -177,7 +177,7 @@ impl Into<u8> for PacketKind {
 }
 
 impl PacketKind {
-    crate fn is_response(&self) -> bool {
+    pub(crate) fn is_response(&self) -> bool {
         match self {
             Self::Failure
             | Self::Success
@@ -192,9 +192,9 @@ impl PacketKind {
 const MESSAGE_LEN: usize = 4;
 
 #[derive(Clone, Debug, Default, Eq, Getters, PartialEq, Setters)]
-#[get = "crate"]
-#[set = "crate"]
-crate struct Packet {
+#[get = "pub(crate)"]
+#[set = "pub(crate)"]
+pub(crate) struct Packet {
     kind: PacketKind,
     payload: Bytes,
 }
@@ -209,7 +209,7 @@ impl fmt::Display for Packet {
 }
 
 impl Packet {
-    crate async fn write_packet<S>(self, stream: &mut S) -> Result<()>
+    pub(crate) async fn write_packet<S>(self, stream: &mut S) -> Result<()>
     where
         S: AsyncWrite + Unpin + Send,
     {
@@ -225,7 +225,7 @@ impl Packet {
         Ok(())
     }
 
-    crate async fn read_packet<S>(stream: &mut S) -> Result<Self>
+    pub(crate) async fn read_packet<S>(stream: &mut S) -> Result<Self>
     where
         S: AsyncRead + Unpin + Send,
     {

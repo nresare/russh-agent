@@ -16,7 +16,7 @@ use crate::{
 use bytes::{BufMut, Bytes, BytesMut};
 
 #[derive(Clone, Debug, Default)]
-crate struct SignRequest {
+pub(crate) struct SignRequest {
     key: Bytes,
     data: Bytes,
     flags: u32,
@@ -42,7 +42,7 @@ impl IntoPacket for SignRequest {
 }
 
 impl SignRequest {
-    crate fn new(key: Bytes, data: Bytes, flags: u32) -> Self {
+    pub(crate) fn new(key: Bytes, data: Bytes, flags: u32) -> Self {
         Self { key, data, flags }
     }
 }
